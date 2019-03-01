@@ -18,37 +18,39 @@ app.post('/api/csv_fileupload', (req, res) => {
   const busboy = new Busboy({ headers: req.headers });
   const uploads = {};
   const allowMimeTypes = ['text/csv'];
-  const storage = new Storage();
-  const bucket = storage.bucket(functions.config().fileupload.bucket.name);
+  const bucket = (new Storage()).bucket(functions.config().fileupload.bucket.name);
 
   busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
     if (!allowMimeTypes.includes(mimetype.toLocaleLowerCase())) {
       console.warn('disallow mimetype: ' + mimetype);
       return;
     }
-    const tmpdir = os.tmpdir();
-    const filepath = path.join(tmpdir, filename);
+    const filepath = path.join(os.tmpdir(), filename);
+
     file.pipe(fs.createWriteStream(filepath));
 
     file.on('end', () => {
       console.log('upload file: ' + filepath + ' metadata: ' + mimetype);
       uploads[fieldname] = { filepath, mimetype };
-      bucket.upload(filepath, { destination: `f-expend_csv/${path.parse(filepath).base}`, metadata: { contentType: mimetype } })
-        .then(() => {
-          console.log('file upload success: ' + filepath);
-          return new Promise((resolve, reject) => {
-            fs.unlink(filepath, (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
+      bucket.upload(filepath, {
+        destination: `${functions.config().fileupload.bucket.alias}/${path.parse(filepath).base}`,
+        metadata: { contentType: mimetype }
+      })
+      .then(() => {
+        console.log('file upload success: ' + filepath);
+        return new Promise((resolve, reject) => {
+          fs.unlink(filepath, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
           });
-        })
-        .catch(err => {
-          console.error(err);
         });
+      })
+      .catch(err => {
+        console.error(err);
+      });
     });
   });
 
@@ -64,4 +66,33 @@ app.post('/api/csv_fileupload', (req, res) => {
   busboy.end(req.rawBody);
 });
 
+// api
 exports.api = functions.https.onRequest(app)
+
+// notice CsvFileUploadBucket
+exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload.bucket.name).onFinalize((object) => {
+  const bucketName = functions.config().fileupload.bucket.alias;
+  const filePath = object.name;
+  const fileName = filePath.replace(`${bucketName}/`,'');
+  const tempFilePath = path.join(os.tmpdir(), fileName);
+  const bucket = (new Storage()).bucket(functions.config().fileupload.bucket.name);
+  return bucket.file(filePath).download({
+    destination: tempFilePath,
+  })
+  .then(() => {
+    console.log('csv download success: ', tempFilePath);
+    // TODO: csv parse
+    return new Promise((resolve, reject) => {
+      fs.unlink(tempFilePath, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  })
+  .catch(err => {
+    console.error(err);
+  });
+});
