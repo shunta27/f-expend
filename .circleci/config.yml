@@ -1,0 +1,28 @@
+version: 2
+jobs:
+  deploy_master:
+    docker:
+      - image: circleci/node:10.7
+    steps:
+      - checkout
+      - run:
+          name: npm install (hosting)
+          command: npm i
+      - run:
+          name: npm install (functions)
+          command: cd ./functions && npm i && cd ..
+      - run:
+          name: build
+          command: npm run build
+      - run:
+          name: deploy to Firebase Hosting
+          command: ./node_modules/.bin/firebase deploy  --project "$FIREBASE_PJ" --token=$FIREBASE_TOKEN
+
+workflows:
+  version: 2
+  deploy_master:
+    jobs:
+      - deploy_master:
+          filters:
+            branches:
+              only: master

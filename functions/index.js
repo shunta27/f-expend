@@ -5,8 +5,8 @@ const cors = require('cors');
 const app = express();
 app.use(cors({ origin: true }));
 
-app.get('/', (req, res) => {
-  res.json('api active');
+app.get('/api/health', (req, res) => {
+  res.json('active.');
 });
 
 exports.api = functions.https.onRequest(app)

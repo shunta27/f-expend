@@ -1,5 +1,7 @@
 # f-expend
 
+[![CircleCI](https://circleci.com/gh/shunta27/f-expend.svg?style=svg&circle-token=24652fd890e2d14f73f5610ac02de39c62dd032c)](https://circleci.com/gh/shunta27/f-expend)
+
 > A Vue.js project
 
 - https://f-expend.firebaseapp.com/
