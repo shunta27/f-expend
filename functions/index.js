@@ -1,3 +1,4 @@
+const admin = require("firebase-admin");
 const functions = require('firebase-functions');
 const { Storage } = require('@google-cloud/storage');
 const express = require('express');
@@ -8,6 +9,22 @@ const os = require('os');
 const fs = require('fs');
 const iconv = require('iconv-lite');
 const csv = require('csvtojson');
+
+admin.initializeApp({
+  credential: admin.credential.cert({
+    "private_key": `${functions.config().service_account.private_key}`,
+    "type": `${functions.config().service_account.type}`,
+    "client_email": `${functions.config().service_account.client_email}`,
+    "client_x509_cert_url": `${functions.config().service_account.client_x509_cert_url}`,
+    "auth_uri": `${functions.config().service_account.auth_uri}`,
+    "token_uri": `${functions.config().service_account.token_uri}`,
+    "project_id": `${functions.config().service_account.project_id}`,
+    "client_id": `${functions.config().service_account.client_id}`,
+    "auth_provider_x509_cert_url": `${functions.config().service_account.auth_provider_x509_cert_url}`,
+    "private_key_id": `${functions.config().service_account.private_key_id}`
+  }),
+  databaseURL: 'https://f-expend.firebaseio.com'
+});
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -82,6 +99,9 @@ exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload
   const fileName = filePath.replace(`${bucketName}/`,'');
   const tempFilePath = path.join(os.tmpdir(), fileName);
   const bucket = (new Storage()).bucket(functions.config().fileupload.bucket.name);
+  const db = admin.database();
+  const ref = db.ref('f-expend_csv');
+
   return bucket.file(filePath).download({
     destination: tempFilePath,
   })
@@ -91,12 +111,24 @@ exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload
         noheader: false,
         headers: ['h1','h2','h3','h4','h5','h6','h7']
       }).fromFile(tempFilePath);
-      console.log('csv to json parse data:' + JSON.stringify(jsonArray))
-      return jsonArray;
+      return jsonArray
+        .filter((record, index) => { return (index < jsonArray.length - 1 ) })
+        .map((record) => {
+          return {
+            'using_day':record.h2.replace(/(\d+)年(\d+)月(\d+)日/g , "$1$2$3"),
+            'place':record.h3,
+            'price':record.h5
+          };
+        });
     }
     return parseCsv();
   })
-  .then(() => {
+  .then((data) => {
+    console.log('csv to json parse data:' + JSON.stringify(data));
+    data.forEach(async (record) => {
+      await ref.push(record);
+      return;
+    });
     return new Promise((resolve, reject) => {
       fs.unlink(tempFilePath, (err) => {
         if (err) {
