@@ -6,6 +6,8 @@ const Busboy = require('busboy');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const iconv = require('iconv-lite');
+const csv = require('csvtojson');
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -27,7 +29,11 @@ app.post('/api/csv_fileupload', (req, res) => {
     }
     const filepath = path.join(os.tmpdir(), filename);
 
-    file.pipe(fs.createWriteStream(filepath));
+    // to utf8
+    file
+      .pipe(iconv.decodeStream('SHIFT_JIS'))
+      .pipe(iconv.encodeStream('UTF-8'))
+      .pipe(fs.createWriteStream(filepath));
 
     file.on('end', () => {
       console.log('upload file: ' + filepath + ' metadata: ' + mimetype);
@@ -80,8 +86,17 @@ exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload
     destination: tempFilePath,
   })
   .then(() => {
-    console.log('csv download success: ', tempFilePath);
-    // TODO: csv parse
+    const parseCsv = async () => {
+      const jsonArray = await csv({
+        noheader: false,
+        headers: ['h1','h2','h3','h4','h5','h6','h7']
+      }).fromFile(tempFilePath);
+      console.log('csv to json parse data:' + JSON.stringify(jsonArray))
+      return jsonArray;
+    }
+    return parseCsv();
+  })
+  .then(() => {
     return new Promise((resolve, reject) => {
       fs.unlink(tempFilePath, (err) => {
         if (err) {
