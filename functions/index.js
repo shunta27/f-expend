@@ -99,8 +99,8 @@ exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload
   const fileName = filePath.replace(`${bucketName}/`,'');
   const tempFilePath = path.join(os.tmpdir(), fileName);
   const bucket = (new Storage()).bucket(functions.config().fileupload.bucket.name);
-  const db = admin.database();
-  const ref = db.ref('f-expend_csv');
+  const db = admin.firestore();
+  const ref = db.collection('csv_data');
 
   return bucket.file(filePath).download({
     destination: tempFilePath,
@@ -126,7 +126,7 @@ exports.noticeCsvUpload = functions.storage.object(functions.config().fileupload
   .then((data) => {
     console.log('csv to json parse data:' + JSON.stringify(data));
     data.forEach(async (record) => {
-      await ref.push(record);
+      await ref.add(record);
       return;
     });
     return new Promise((resolve, reject) => {
