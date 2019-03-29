@@ -33,6 +33,33 @@ app.get('/api/health', (req, res) => {
   res.status(200).send(JSON.stringify('active.'));
 });
 
+app.get('/api/csv_data', async (req, res) => {
+  const db = admin.firestore();
+  const ref = db.collection('csv_data');
+
+  if (!req.query.startDt || !req.query.endDt) {
+    res.status(400).send(JSON.stringify('Invalid parameter.'));
+  }
+
+  try {
+    const snapShot = await ref
+      .where('using_day', '>=', req.query.startDt)
+      .where('using_day', '<=', req.query.endDt)
+      .orderBy('using_day', 'desc')
+      .orderBy('place')
+      .get();
+    const data = snapShot.docs.map(doc => {
+      return doc.data();
+    });
+    res.status(200).send(JSON.stringify({
+      data: data
+    }));
+  } catch (error) {
+    console.log(error)
+    res.status(400).send(JSON.stringify(error));
+  }
+});
+
 app.post('/api/csv_fileupload', (req, res) => {
   const busboy = new Busboy({ headers: req.headers });
   const uploads = {};
