@@ -52,7 +52,7 @@ app.get('/api/csv_data', async (req, res) => {
       return doc.data();
     });
     res.status(200).send(JSON.stringify({
-      data: data
+      payListData: data
     }));
   } catch (error) {
     console.log(error)
@@ -68,7 +68,8 @@ app.post('/api/csv_fileupload', (req, res) => {
 
   busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
     if (!allowMimeTypes.includes(mimetype.toLocaleLowerCase())) {
-      console.warn('disallow mimetype: ' + mimetype);
+      console.log('disallow mimetype: ' + mimetype);
+      res.status(400).send(JSON.stringify('disallow mimetype: ' + mimetype));
       return;
     }
     const filepath = path.join(os.tmpdir(), filename);
